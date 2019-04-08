@@ -1,0 +1,32 @@
+{
+  "name": "performa-satellite",
+  "version": "1.0.0",
+  "description": "Remote data collector for Performa.",
+  "author": "Joseph Huckaby <jhuckaby@gmail.com>",
+  "homepage": "https://github.com/jhuckaby/performa-satellite",
+  "license": "MIT",
+  "main": "index.js",
+  "bin": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jhuckaby/performa-satellite"
+  },
+  "bugs": {
+    "url": "https://github.com/jhuckaby/performa-satellite/issues"
+  },
+  "keywords": [
+    "performa"
+  ],
+  "scripts": {
+  	"package": "mkdir -p dist && pkg --targets node10-linux-x64,node10-macos-x64,node10-win-x64 --out-path dist ."
+  },
+  "dependencies": {
+    "pixl-cli": "^1.0.0",
+    "pixl-request": "^1.0.0",
+    "pixl-xml": "^1.0.0",
+    "systeminformation": "4.0.10"
+  },
+  "devDependencies": {
+  	"pkg": "4.3.7"
+  }
+}

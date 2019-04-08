@@ -1,0 +1,6 @@
+{
+	"enabled": true,
+	"host": "performa.local:5511",
+	"secret_key": "CHANGE_ME",
+	"group": ""
+}
