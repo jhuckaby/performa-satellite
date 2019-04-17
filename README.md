@@ -8,12 +8,12 @@ The easiest way to install Performa Satellite is to use one of our precompiled b
 
 ```
 mkdir /opt/performa
-curl -L https://github.com/jhuckaby/performa-satellite/releases/download/v1.0.0/performa-satellite-linux > /opt/performa/satellite.bin
+curl -L https://github.com/jhuckaby/performa-satellite/releases/download/v1.0.1/performa-satellite-linux > /opt/performa/satellite.bin
 chmod 755 /opt/performa/satellite.bin
 /opt/performa/satellite.bin --install
 ```
 
-Replace the `v1.0.0` with the current latest stable version number.  The `linux` binary should work on any 64-bit Linux OS, including RedHat/CentOS and Debian/Ubuntu.  If you are installing on macOS, replace `linux` with `macos`.  There is also a [Windows executable](https://github.com/jhuckaby/performa-satellite/releases/download/v1.0.0/performa-satellite-win.exe) available, but it is untested (and no [cron](https://en.wikipedia.org/wiki/Cron) there to automate it).
+Replace the `v1.0.1` with the current latest stable version number.  The `linux` binary should work on any 64-bit Linux OS, including RedHat/CentOS and Debian/Ubuntu.  If you are installing on macOS, replace `linux` with `macos`.  There is also a [Windows executable](https://github.com/jhuckaby/performa-satellite/releases/download/v1.0.0/performa-satellite-win.exe) available, but it is untested (and no [cron](https://en.wikipedia.org/wiki/Cron) there to automate it).
 
 Running the binary with the `--install` argument will add it to [cron](https://en.wikipedia.org/wiki/Cron), specifically in `/etc/cron.d/performa-satellite.cron`, which is set to run once per minute.  It also creates a default configuration file, if one doesn't exist.
 
@@ -50,6 +50,7 @@ The Performa Satellite binary executable accepts the following command-line argu
 | Argument | Description |
 |----------|-------------|
 | `--install` | This runs first-time installation tasks such as creating the cron job and a sample configuration file. |
+| `--config` | Optionally specify a custom location on disk for the configuration file. |
 | `--debug` | Setting this flag runs the collector in debug mode, causing it to emit raw stats on the console rather than submitting them to the server. |
 | `--nosleep` | This disables the random sleep that Satellite performs before collecting and sending metrics. |
 | `--hostname` | This allows you to specify a custom local hostname, to use in place of the actual server hostname. |

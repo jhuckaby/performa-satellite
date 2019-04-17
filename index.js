@@ -14,6 +14,7 @@ var XML = require('pixl-xml');
 var Request = require('pixl-request');
 var cli = require('pixl-cli');
 var si = require('systeminformation');
+var sqparse = require('shell-quote').parse;
 
 var request = new Request("Performa-Satellite/1.0");
 request.setTimeout( 3 * 1000 ); // 3 seconds
@@ -65,7 +66,7 @@ else if (fs.existsSync( Path.join(__dirname, 'config.json') )) {
 }
 
 // exit quietly if not enabled
-if (!config.enabled && !args.enabled && !process.env['PERFORMA_ENABLED']) process.exit(0);
+if (!config.enabled && !args.enabled && !process.env['PERFORMA_ENABLED'] && !args.debug) process.exit(0);
 
 // optionally switch users
 if (!args.debug && config.uid && (process.getuid() == 0)) {
@@ -104,6 +105,8 @@ if (group_id) info.group = group_id;
 var commands = [];
 var host_hash = Tools.digestHex( info.hostname, 'md5' );
 var host_id = parseInt( host_hash.substring(0, 16), 16 ); // 64-bit numerical hash
+var state_file = Path.join( os.tmpdir(), "performa-satellite-temp.json" );
+var state = {};
 
 async.series([
 	function(callback) {
@@ -113,6 +116,15 @@ async.series([
 		
 		var sleep_ms = 1000 + (host_id % 5000);
 		setTimeout( function() { callback(); }, sleep_ms );
+	},
+	function(callback) {
+		// load state data if cache file exists
+		fs.readFile( state_file, 'utf8', function(err, data) {
+			if (err || !data) return callback();
+			try { state = JSON.parse(data); }
+			catch (e) {;}
+			callback();
+		});
 	},
 	function(callback) {
 		// first call home to say hello and gs list of custom commands to run, if any
@@ -135,7 +147,10 @@ async.series([
 			if (err) err_msg = "Performa Satellite Error: Failed to call home: " + err;
 			else if (data.code) err_msg = "Performa Satellite Error: API returned: " + data.description;
 			if (err_msg) {
-				if (args.debug) warn( "Warning: " + err_msg + "\n" );
+				if (args.debug) {
+					warn( "Warning: " + err_msg + "\n" );
+					return callback();
+				}
 				else die( err_msg + "\n" );
 			}
 			
@@ -178,13 +193,18 @@ async.series([
 		// cpu load
 		si.currentLoad( function(data) {
 			Tools.mergeHashInto( info.data.cpu, data );
+			delete info.data.cpu.cpus;
 			callback();
 		} );
 	},
 	function(callback) {
 		// file systems
 		si.fsSize( function(data) {
-			info.data.mounts = data;
+			info.data.mounts = {};
+			data.forEach( function(item) {
+				var key = item.mount.replace(/^\//, '').replace(/\W+/g, '_') || 'root';
+				info.data.mounts[key] = item;
+			});
 			callback();
 		} );
 	},
@@ -239,6 +259,59 @@ async.series([
 		} );
 	},
 	function(callback) {
+		// try to calculate iowait % (linux only)
+		// borrowed from: https://github.com/cgoldberg/linux-metrics/blob/master/linux_metrics/cpu_stat.py
+		if ((process.platform != 'linux') || !fs.existsSync('/proc/stat')) return process.nextTick( callback );
+		
+		var proc_lines = fs.readFileSync( '/proc/stat', 'utf8' ).trim().split(/\n/);
+		var cpu_values = [];
+		if (proc_lines.length && proc_lines[0].match(/^\s*cpu\s+(.+)$/)) {
+			// cpu modes: 'user', 'nice', 'system', 'idle', 'iowait', 'irq', 'softirq'
+			// example line: cpu  390342886 2008 61172413 10515105584 55459893 0 1181764 2841058 0 0
+			cpu_values = RegExp.$1.trim().split(/\s+/).map( function(value) { return parseInt(value); } );
+		}
+		
+		if (cpu_values.length && state.proc_stat && (cpu_values.length == state.proc_stat.cpu_values.length)) {
+			// ah, we have saved values from last time, get deltas
+			var sec_elapsed = Math.max( 1, info.date - state.proc_stat.date );
+			
+			var cpu_deltas = cpu_values.map( function(value, idx) {
+				return Math.max( 0, value - state.proc_stat.cpu_values[idx] );
+			});
+			
+			var delta_total = 0;
+			cpu_deltas.forEach( function(delta) { delta_total += delta; } );
+			if (!delta_total) delta_total = 1; // prevent divide-by-zero
+			
+			// convert each to percentage of total
+			var percents = cpu_deltas.map( function(delta) {
+				return Tools.shortFloat( 100 - (100 * ((delta_total - delta) / delta_total)) );
+			});
+			
+			info.data.cpu.percentages = {
+				'user': percents[0],
+				'nice': percents[1],
+				'system': percents[2],
+				'idle': percents[3],
+				'iowait': percents[4],
+				'irq': percents[5],
+				'softirq': percents[6]
+			};
+		}
+		
+		// store current values in state cache for next time
+		state.proc_stat = {
+			date: info.date,
+			cpu_values: cpu_values
+		};
+		
+		process.nextTick( callback );
+	},
+	function(callback) {
+		// write state data back out to cache file on disk
+		fs.writeFile( state_file, JSON.stringify(state), callback );
+	},
+	function(callback) {
 		// custom commands
 		if (!commands.length) return process.nextTick( callback );
 		info.data.commands = {};
@@ -247,12 +320,14 @@ async.series([
 			function(command, callback) {
 				// exec single command
 				if (!command.timeout) command.timeout = 5; // default 5 sec
+				
 				var child_opts = { 
-					timeout: command.timeout * 1000,
+					// timeout: command.timeout * 1000,
 					windowsHide: true,
-					env: Tools.copyHash( process.env )
+					env: Tools.copyHash( process.env ),
+					stdio: ['pipe', 'pipe', 'ignore']
 				};
-				if (command.uid != 0) {
+				if (command.uid && (command.uid != 0)) {
 					var user_info = Tools.getpwnam( command.uid, true );
 					if (user_info) {
 						child_opts.uid = parseInt( user_info.uid );
@@ -267,10 +342,47 @@ async.series([
 					}
 				}
 				
-				cp.exec( command.exec, child_opts, function(err, stdout, stderr) {
-					var result = '';
-					if (err) result = '' + err;
-					else result = '' + stdout;
+				var child = null;
+				var child_cmd = command.exec;
+				var child_args = [];
+				var child_output = '';
+				var child_timeout_err_msg = '';
+				var callback_fired = false;
+				
+				// if command has cli args, parse using shell-quote
+				if (child_cmd.match(/\s+(.+)$/)) {
+					var cargs_raw = RegExp.$1;
+					child_cmd = child_cmd.replace(/\s+(.+)$/, '');
+					child_args = sqparse( cargs_raw, child_opts.env );
+				}
+				
+				var child_timer = setTimeout( function() {
+					// timed out
+					child_timeout_err_msg = "Command timed out after " + command.timeout + " seconds";
+					child.kill(); // should fire exit event
+				}, command.timeout * 1000 );
+				
+				// spawn child
+				try {
+					child = cp.spawn( child_cmd, child_args, child_opts );
+				}
+				catch (err) {
+					clearTimeout( child_timer );
+					info.data.commands[ command.id ] = "Error: Could not execute command: " + child_cmd + ": " + Tools.getErrorDescription(err);
+					if (!callback_fired) { callback_fired = true; callback(); }
+				}
+				
+				child.on('error', function (err) {
+					// child error
+					clearTimeout( child_timer );
+					info.data.commands[ command.id ] = "Error: Could not execute command: " + child_cmd + ": " + Tools.getErrorDescription(err);
+					if (!callback_fired) { callback_fired = true; callback(); }
+				} );
+				
+				child.on('exit', function (code, signal) {
+					// child exited
+					clearTimeout( child_timer );
+					var result = child_timeout_err_msg || child_output;
 					
 					// automatically parse JSON or XML
 					if ((command.format == 'json') && result.match(/(\{|\[)/)) {
@@ -293,8 +405,20 @@ async.series([
 					}
 					
 					info.data.commands[ command.id ] = result;
-					callback();
-				}); // exec
+					if (!callback_fired) { callback_fired = true; callback(); }
+				});
+				
+				if (child.stdout) {
+					child.stdout.on('data', function(data) {
+						child_output += data.toString();
+						if (child_output.length > 32 * 1024) child.kill(); // sanity
+					});
+				}
+				
+				if (child.stdin && command.script) {
+					child.stdin.write( command.script + "\n" );
+				}
+				child.stdin.end();
 			},
 			callback
 		);
@@ -310,7 +434,7 @@ async.series([
 				'memory/used',
 				'memory/available',
 				'stats/network/conns',
-				'mounts/0/use',
+				'mounts/root/use',
 				'stats/fs/rx',
 				'stats/fs/wx',
 				'stats/io/tIO',
@@ -352,11 +476,12 @@ async.series([
 		} // fake
 		
 		if (args.debug) {
+			// if debug mode is set, dump all metrics to console and exit (no submit)
 			print( JSON.stringify(info, null, "\t") + "\n" );
 			process.exit(0);
 		}
 		
-		// submit metrics via JSON HTTP POST
+		// submit metrics to Performa central server via JSON HTTP POST
 		var url = api_proto + "//" + api_host + "/api/app/submit";
 		request.json( url, info, function(err, resp, data, perf) {
 			if (err) die("Performa Satellite Error: Failed to submit data: " + err + "\n");
