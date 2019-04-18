@@ -38,8 +38,10 @@ if (args.install || (args.other && (args.other[0] == 'install'))) {
 	raw_tab += '* * * * * root ' + self_bin + "\n";
 	
 	var cron_file = '/etc/cron.d/performa-satellite.cron';
-	fs.writeFileSync( cron_file, raw_tab, { mode: 0o744 } );
-	fs.utimesSync( '/etc/crontab', new Date(), new Date() );
+	fs.writeFileSync( cron_file, raw_tab, { mode: 0o644 } );
+	// try to give crond a hint that it needs to reload
+	if (fs.existsSync('/etc/crontab')) fs.utimesSync( '/etc/crontab', new Date(), new Date() );
+	if (fs.existsSync('/var/spool/cron')) fs.utimesSync( '/var/spool/cron', new Date(), new Date() );
 	print("\nPerforma Satellite has been installed to cron:\n\t" + cron_file + "\n");
 	
 	if (!fs.existsSync(config_file)) {
