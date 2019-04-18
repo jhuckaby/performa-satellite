@@ -35,6 +35,7 @@ if (args.install || (args.other && (args.other[0] == 'install'))) {
 	var raw_tab = "";
 	raw_tab += "# Run Performa Satellite data collector once per minute.\n";
 	raw_tab += "# See: https://github.com/jhuckaby/performa-satellite\n";
+	raw_tab += "PATH=$PATH:/usr/bin:/bin:/usr/local/bin:/usr/sbin:/sbin:/usr/local/sbin\n";
 	raw_tab += '* * * * * root ' + self_bin + "\n";
 	
 	var cron_file = '/etc/cron.d/performa-satellite.cron';
