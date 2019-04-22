@@ -36,7 +36,7 @@ if (args.install || (args.other && (args.other[0] == 'install'))) {
 	raw_tab += "# Run Performa Satellite data collector once per minute.\n";
 	raw_tab += "# See: https://github.com/jhuckaby/performa-satellite\n";
 	raw_tab += "PATH=$PATH:/usr/bin:/bin:/usr/local/bin:/usr/sbin:/sbin:/usr/local/sbin\n";
-	raw_tab += '* * * * * root ' + self_bin + "\n";
+	raw_tab += '* * * * * root ' + self_bin + " --quiet\n";
 	
 	var cron_file = '/etc/cron.d/performa-satellite.cron';
 	fs.writeFileSync( cron_file, raw_tab, { mode: 0o644 } );
@@ -110,6 +110,7 @@ var host_hash = Tools.digestHex( info.hostname, 'md5' );
 var host_id = parseInt( host_hash.substring(0, 16), 16 ); // 64-bit numerical hash
 var state_file = Path.join( os.tmpdir(), "performa-satellite-temp.json" );
 var state = {};
+var snapshot = { network: {}, processes: {} };
 
 async.series([
 	function(callback) {
@@ -249,7 +250,17 @@ async.series([
 	function(callback) {
 		// count open network sockets
 		si.networkConnections( function(data) {
-			info.data.stats.network.conns = data ? data.length : 0;
+			if (!data) data = [];
+			info.data.stats.network.conns = data.length;
+			info.data.stats.network.states = { established: 0 };
+			data.forEach( function(conn) {
+				if (conn.state) {
+					var key = conn.state.toLowerCase();
+					if (!info.data.stats.network.states[key]) info.data.stats.network.states[key] = 0;
+					info.data.stats.network.states[key]++;
+				}
+			});
+			snapshot.network.connections = data;
 			callback();
 		} );
 	},
@@ -257,6 +268,7 @@ async.series([
 		// all processes
 		si.processes( function(data) {
 			info.data.processes = data;
+			snapshot.processes.list = info.data.processes.list;
 			delete info.data.processes.list;
 			callback();
 		} );
@@ -266,47 +278,59 @@ async.series([
 		// borrowed from: https://github.com/cgoldberg/linux-metrics/blob/master/linux_metrics/cpu_stat.py
 		if ((process.platform != 'linux') || !fs.existsSync('/proc/stat')) return process.nextTick( callback );
 		
+		info.data.cpu.cpus = {};
+		
 		var proc_lines = fs.readFileSync( '/proc/stat', 'utf8' ).trim().split(/\n/);
-		var cpu_values = [];
-		if (proc_lines.length && proc_lines[0].match(/^\s*cpu\s+(.+)$/)) {
-			// cpu modes: 'user', 'nice', 'system', 'idle', 'iowait', 'irq', 'softirq'
-			// example line: cpu  390342886 2008 61172413 10515105584 55459893 0 1181764 2841058 0 0
-			cpu_values = RegExp.$1.trim().split(/\s+/).map( function(value) { return parseInt(value); } );
-		}
+		proc_lines.forEach( function(line) {
+			if (line.match(/^\s*(cpu\d*)\s+(.+)$/)) {
+				var cpu_key = RegExp.$1;
+				var cpu_values = RegExp.$2.trim().split(/\s+/).map( function(value) { return parseInt(value); } );
+				
+				if (cpu_values.length && state.proc_stat && state.proc_stat[cpu_key]) {
+					var cpu_deltas = cpu_values.map( function(value, idx) {
+						return Math.max( 0, value - state.proc_stat[cpu_key][idx] );
+					});
+					
+					var delta_total = 0;
+					cpu_deltas.forEach( function(delta) { delta_total += delta; } );
+					if (!delta_total) delta_total = 1; // prevent divide-by-zero
+					
+					// convert each to percentage of total
+					var percents = cpu_deltas.map( function(delta) {
+						return Tools.shortFloat( 100 - (100 * ((delta_total - delta) / delta_total)) );
+					});
+					
+					// format for JSON
+					var pct_fmt = {
+						'user': percents[0],
+						'nice': percents[1],
+						'system': percents[2],
+						'idle': percents[3],
+						'iowait': percents[4],
+						'irq': percents[5],
+						'softirq': percents[6]
+					};
+					
+					if (cpu_key == 'cpu') info.data.cpu.totals = pct_fmt;
+					else info.data.cpu.cpus[cpu_key] = pct_fmt;
+				} // found state
+				else {
+					// fill with zeroes for now
+					var pct_fmt = { user:0, nice:0, system:0, idle:100, iowait:0, irq:0, softirq:0 };
+					if (cpu_key == 'cpu') info.data.cpu.totals = pct_fmt;
+					else info.data.cpu.cpus[cpu_key] = pct_fmt;
+				}
+				
+				if (!state.proc_stat) state.proc_stat = {};
+				state.proc_stat[cpu_key] = cpu_values;
+			}
+		}); // foreach line
 		
-		if (cpu_values.length && state.proc_stat && (cpu_values.length == state.proc_stat.cpu_values.length)) {
-			// ah, we have saved values from last time, get deltas
-			var sec_elapsed = Math.max( 1, info.date - state.proc_stat.date );
-			
-			var cpu_deltas = cpu_values.map( function(value, idx) {
-				return Math.max( 0, value - state.proc_stat.cpu_values[idx] );
-			});
-			
-			var delta_total = 0;
-			cpu_deltas.forEach( function(delta) { delta_total += delta; } );
-			if (!delta_total) delta_total = 1; // prevent divide-by-zero
-			
-			// convert each to percentage of total
-			var percents = cpu_deltas.map( function(delta) {
-				return Tools.shortFloat( 100 - (100 * ((delta_total - delta) / delta_total)) );
-			});
-			
-			info.data.cpu.percentages = {
-				'user': percents[0],
-				'nice': percents[1],
-				'system': percents[2],
-				'idle': percents[3],
-				'iowait': percents[4],
-				'irq': percents[5],
-				'softirq': percents[6]
-			};
+		// cleanup old mess
+		if (state.proc_stat) {
+			delete state.proc_stat.date;
+			delete state.proc_stat.cpu_values;
 		}
-		
-		// store current values in state cache for next time
-		state.proc_stat = {
-			date: info.date,
-			cpu_values: cpu_values
-		};
 		
 		process.nextTick( callback );
 	},
@@ -486,9 +510,25 @@ async.series([
 		
 		// submit metrics to Performa central server via JSON HTTP POST
 		var url = api_proto + "//" + api_host + "/api/app/submit";
+		
 		request.json( url, info, function(err, resp, data, perf) {
 			if (err) die("Performa Satellite Error: Failed to submit data: " + err + "\n");
-			callback();
+			
+			if (data.take_snapshot && data.time_code) {
+				// server has requested a snapshot
+				// (includes all running procs and open conns)
+				snapshot.version = "1.0";
+				snapshot.hostname = info.hostname;
+				snapshot.source = data.snapshot_source;
+				snapshot.time_code = data.time_code;
+				url = api_proto + "//" + api_host + "/api/app/snapshot";
+				
+				request.json( url, snapshot, function(err, resp, data, perf) {
+					if (err) die("Performa Satellite Error: Failed to submit data: " + err + "\n");
+					callback();
+				});
+			}
+			else callback();
 		});
 	}
 ]);
