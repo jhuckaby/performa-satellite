@@ -56,6 +56,20 @@ if (args.install || (args.other && (args.other[0] == 'install'))) {
 	print("\n");
 	process.exit(0);
 }
+else if (args.uninstall || (args.other && (args.other[0] == 'uninstall'))) {
+	// remove from cron and exit
+	var cron_file = '/etc/cron.d/performa-satellite.cron';
+	if (!fs.existsSync(cron_file)) die("\nPerforma Satellite is not currently installed, so just delete this file and it's super gone.\n\n");
+	fs.unlinkSync( cron_file );
+	// try to give crond a hint that it needs to reload
+	if (fs.existsSync('/etc/crontab')) fs.utimesSync( '/etc/crontab', new Date(), new Date() );
+	if (fs.existsSync('/var/spool/cron')) fs.utimesSync( '/var/spool/cron', new Date(), new Date() );
+	if (fs.existsSync(config_file)) fs.unlinkSync( config_file );
+	print("\nPerforma Satellite has been removed.\n");
+	print("To complete the uninstall, simply delete this file.\n");
+	print("\n");
+	process.exit(0);
+}
 
 // optional config file, in same dir as executable or custom location
 if (args.config && fs.existsSync(args.config)) {

@@ -50,6 +50,7 @@ The Performa Satellite binary executable accepts the following command-line argu
 | Argument | Description |
 |----------|-------------|
 | `--install` | This runs first-time installation tasks such as creating the cron job and a sample configuration file. |
+| `--uninstall` | This removes the cron job and deletes the config file, if one is found. |
 | `--config` | Optionally specify a custom location on disk for the configuration file. |
 | `--debug` | Setting this flag runs the collector in debug mode, causing it to emit raw stats on the console rather than submitting them to the server. |
 | `--nosleep` | This disables the random sleep that Satellite performs before collecting and sending metrics. |
