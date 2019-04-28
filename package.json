@@ -1,6 +1,6 @@
 {
   "name": "performa-satellite",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Remote data collector for Performa.",
   "author": "Joseph Huckaby <jhuckaby@gmail.com>",
   "homepage": "https://github.com/jhuckaby/performa-satellite",

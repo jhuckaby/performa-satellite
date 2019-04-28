@@ -537,10 +537,39 @@ async.series([
 				snapshot.time_code = data.time_code;
 				url = api_proto + "//" + api_host + "/api/app/snapshot";
 				
-				request.json( url, snapshot, function(err, resp, data, perf) {
-					if (err) die("Performa Satellite Error: Failed to submit data: " + err + "\n");
-					callback();
-				});
+				// the process CPU values from systeminformation are incorrect, so we have to grab them ourselves
+				// this works on at least: OS X, Fedora, Ubuntu and CentOS
+				var ps_cmd = '/bin/ps -eo "ppid pid %cpu rss"';
+				cp.exec( ps_cmd, { timeout: 5 * 1000 }, function(err, stdout, stderr) {
+					if (err) die("Performa Satellite Error: Failed to exec ps: " + err + "\n");
+					
+					var lines = stdout.split(/\n/);
+					var pids = {};
+					
+					// process each line from ps response
+					for (var idx = 0, len = lines.length; idx < len; idx++) {
+						var line = lines[idx];
+						if (line.match(/(\d+)\s+(\d+)\s+([\d\.]+)\s+(\d+)/)) {
+							var ppid = parseInt( RegExp.$1 );
+							var pid = parseInt( RegExp.$2 );
+							var cpu = parseFloat( RegExp.$3 );
+							var mem = parseInt( RegExp.$4 ); // Note: This is in KB
+							pids[ pid ] = { ppid: ppid, cpu: cpu, mem: mem };
+						} // good line
+					} // foreach line
+					
+					snapshot.processes.list.forEach( function(process) {
+						if (pids[process.pid]) {
+							process.pcpu = pids[process.pid].cpu;
+							process.mem_rss = pids[process.pid].mem;
+						}
+					} );
+					
+					request.json( url, snapshot, function(err, resp, data, perf) {
+						if (err) die("Performa Satellite Error: Failed to submit data: " + err + "\n");
+						callback();
+					});
+				}); // cp.exec
 			}
 			else callback();
 		});
