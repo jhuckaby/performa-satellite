@@ -20,7 +20,7 @@ var request = new Request("Performa-Satellite/1.0");
 request.setTimeout( 3 * 1000 ); // 3 seconds
 request.setAutoError( true );
 request.setRetries( 3 );
-request.setKeepAlive( true );
+// request.setKeepAlive( true );
 
 cli.global();
 var Tools = cli.Tools;
