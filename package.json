@@ -1,6 +1,6 @@
 {
 	"name": "performa-satellite",
-	"version": "1.0.8",
+	"version": "1.0.9",
 	"description": "Remote data collector for Performa.",
 	"author": "Joseph Huckaby <jhuckaby@gmail.com>",
 	"homepage": "https://github.com/jhuckaby/performa-satellite",
@@ -18,7 +18,7 @@
 		"performa"
 	],
 	"scripts": {
-		"package": "mkdir -p dist && pkg --targets node10-linux-x64,node10-macos-x64,node10-win-x64 --out-path dist ."
+		"package": "mkdir -p dist && pkg --targets node12-linux-x64,node12-macos-x64,node12-win-x64 --out-path dist ."
 	},
 	"dependencies": {
 		"pixl-cli": "^1.0.0",
@@ -28,6 +28,6 @@
 		"shell-quote": "1.6.1"
 	},
 	"devDependencies": {
-		"pkg": "4.3.7"
+		"pkg": "4.4.6"
 	}
 }

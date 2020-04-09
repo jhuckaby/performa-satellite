@@ -4,7 +4,7 @@
 // Gathers metrics and submits them to a Performa master server
 // Install via crontab to run every minute
 // See: https://github.com/jhuckaby/performa-satellite
-// Copyright (c) 2019 Joseph Huckaby, MIT License
+// Copyright (c) 2019 - 2020 Joseph Huckaby, MIT License
 
 var fs = require('fs');
 var os = require('os');
