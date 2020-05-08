@@ -121,10 +121,34 @@ if (group_id) info.group = group_id;
 
 var commands = [];
 var host_hash = Tools.digestHex( info.hostname, 'md5' );
-var host_id = parseInt( host_hash.substring(0, 16), 16 ); // 64-bit numerical hash
+var host_id = parseInt( host_hash.substring(0, 8), 16 ); // 32-bit numerical hash
 var state_file = Path.join( os.tmpdir(), "performa-satellite-temp.json" );
 var state = {};
 var snapshot = { network: {}, processes: {} };
+
+if (config.use_curl) {
+	// use curl instead of pixl-request
+	var curl_bin = (config.use_curl === true) ? '/usr/bin/curl' : config.use_curl;
+	
+	request.json = function(url, data, callback) {
+		var data_file = Path.join( os.tmpdir(), "performa-satellite-data.json" );
+		fs.writeFileSync( data_file, JSON.stringify(data) + "\n" );
+		
+		var cmd = curl_bin + ' -s -m 5 -H "Content-Type: application/json" -d "@' + data_file + '" "' + url + '"';
+		cp.exec( cmd, { timeout: 6 * 1000 }, function(err, stdout, stderr) {
+			if (err) return callback(err);
+			if (stderr.match(/\S/)) return callback( new Error(stderr) );
+			
+			var json = null;
+			try { json = JSON.parse( ''+stdout ); }
+			catch (err) {
+				return callback(err);
+			}
+			
+			callback(false, {}, json, {});
+		} ); // cp.exec
+	}; // request.json
+} // curl
 
 async.series([
 	function(callback) {
@@ -132,7 +156,8 @@ async.series([
 		// this is to avoid multiple servers from submitting metrics at the same instant
 		if (args.debug || args.nosleep) return process.nextTick(callback);
 		
-		var sleep_ms = 1000 + (host_id % 5000);
+		var max_sleep_ms = config.max_sleep_ms || 5000;
+		var sleep_ms = 1000 + (host_id % max_sleep_ms);
 		setTimeout( function() { callback(); }, sleep_ms );
 	},
 	function(callback) {
