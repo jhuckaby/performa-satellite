@@ -190,6 +190,15 @@ async.series([
 			if (err) err_msg = "Performa Satellite Error: Failed to call home: " + err;
 			else if (data.code) err_msg = "Performa Satellite Error: API returned: " + data.description;
 			if (err_msg) {
+				var err_file = Path.join( os.tmpdir(), "performa-satellite-error.txt" );
+				fs.writeFileSync( err_file, [
+					"Date/Time: " + (new Date()).toString(),
+					"URL: " + url,
+					"Error: " + err_msg,
+					"Data:",
+					JSON.stringify(hello)
+				].join("\n") + "\n" );
+				
 				if (args.debug) {
 					warn( "Warning: " + err_msg + "\n" );
 					return callback();
@@ -551,7 +560,18 @@ async.series([
 		var url = api_proto + "//" + api_host + "/api/app/submit";
 		
 		request.json( url, info, function(err, resp, data, perf) {
-			if (err) die("Performa Satellite Error: Failed to submit data: " + err + "\n");
+			if (err) {
+				var err_file = Path.join( os.tmpdir(), "performa-satellite-error.txt" );
+				fs.writeFileSync( err_file, [
+					"Date/Time: " + (new Date()).toString(),
+					"URL: " + url,
+					"Error: " + err,
+					"Data:",
+					JSON.stringify(info)
+				].join("\n") + "\n" );
+				
+				die("Performa Satellite Error: Failed to submit data: " + err + "\n");
+			}
 			
 			if (data.take_snapshot && data.time_code) {
 				// server has requested a snapshot
@@ -591,7 +611,18 @@ async.series([
 					} );
 					
 					request.json( url, snapshot, function(err, resp, data, perf) {
-						if (err) die("Performa Satellite Error: Failed to submit data: " + err + "\n");
+						if (err) {
+							var err_file = Path.join( os.tmpdir(), "performa-satellite-error.txt" );
+							fs.writeFileSync( err_file, [
+								"Date/Time: " + (new Date()).toString(),
+								"URL: " + url,
+								"Error: " + err,
+								"Data:",
+								JSON.stringify(snapshot)
+							].join("\n") + "\n" );
+							
+							die("Performa Satellite Error: Failed to submit snapshot data: " + err + "\n");
+						}
 						callback();
 					});
 				}); // cp.exec
