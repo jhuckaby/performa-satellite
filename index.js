@@ -16,7 +16,7 @@ var cli = require('pixl-cli');
 var si = require('systeminformation');
 var sqparse = require('shell-quote').parse;
 
-var request = new Request("Performa-Satellite/1.0");
+var request = new Request("Performa-Satellite/1.0.17");
 request.setTimeout( 5 * 1000 ); // 3 seconds
 request.setAutoError( true );
 request.setRetries( 5 );
