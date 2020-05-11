@@ -17,11 +17,12 @@ var si = require('systeminformation');
 var sqparse = require('shell-quote').parse;
 
 var request = new Request("Performa-Satellite/1.0");
-request.setTimeout( 3 * 1000 ); // 3 seconds
+request.setTimeout( 5 * 1000 ); // 3 seconds
 request.setAutoError( true );
-request.setRetries( 3 );
+request.setRetries( 5 );
 request.setAutoContentLength( false );
-// request.setKeepAlive( true );
+request.setKeepAlive( true );
+request.retryMatch = /^[45]\d\d$/;
 
 cli.global();
 var Tools = cli.Tools;
