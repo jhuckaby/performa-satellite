@@ -1,6 +1,6 @@
 {
 	"name": "performa-satellite",
-	"version": "1.0.12",
+	"version": "1.0.13",
 	"description": "Remote data collector for Performa.",
 	"author": "Joseph Huckaby <jhuckaby@gmail.com>",
 	"homepage": "https://github.com/jhuckaby/performa-satellite",
@@ -22,7 +22,7 @@
 	},
 	"dependencies": {
 		"pixl-cli": "^1.0.0",
-		"pixl-request": "^1.0.0",
+		"pixl-request": "^1.0.29",
 		"pixl-xml": "^1.0.0",
 		"systeminformation": "4.12.0",
 		"shell-quote": "1.6.1"
