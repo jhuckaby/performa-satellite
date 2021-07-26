@@ -16,7 +16,7 @@ var cli = require('pixl-cli');
 var si = require('systeminformation');
 var sqparse = require('shell-quote').parse;
 
-var request = new Request("Performa-Satellite/1.0.17");
+var request = new Request("Performa-Satellite/1.1.1");
 request.setTimeout( 5 * 1000 ); // 3 seconds
 request.setAutoError( true );
 request.setRetries( 5 );
@@ -647,11 +647,15 @@ async.series([
 
 function getOpenFiles(callback) {
 	// use lsof to include all open files to the snap
-	var lsof = Tools.findBinSync('lsof');
-	if (!lsof) return callback( new Error("Cannot locate lsof binary.") );
+	var cmd = Tools.findBinSync('lsof');
+	if (!cmd) return callback( new Error("Cannot locate lsof binary.") );
 	
-	// lsof options: machine-readable output, and skip blocking ops
-	var cmd = lsof + ' -RPn -F tpfn';
+	// linux only: prevent duplicate files for threads
+	if (process.platform == 'linux') cmd += ' -Ki';
+	
+	// rest of lsof CLI options are universal:
+	// machine-readable output, and skip blocking ops
+	cmd += ' -RPn -F tpfn';
 	
 	cp.exec( cmd, { timeout: 10 * 1000 }, function(err, stdout, stderr) {
 		if (err) return callback(err);
