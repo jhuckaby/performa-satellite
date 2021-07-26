@@ -16,7 +16,7 @@ var cli = require('pixl-cli');
 var si = require('systeminformation');
 var sqparse = require('shell-quote').parse;
 
-var request = new Request("Performa-Satellite/1.1.1");
+var request = new Request("Performa-Satellite/1.1.2");
 request.setTimeout( 5 * 1000 ); // 3 seconds
 request.setAutoError( true );
 request.setRetries( 5 );
@@ -654,8 +654,8 @@ function getOpenFiles(callback) {
 	if (process.platform == 'linux') cmd += ' -Ki';
 	
 	// rest of lsof CLI options are universal:
-	// machine-readable output, and skip blocking ops
-	cmd += ' -RPn -F tpfn';
+	// machine-readable output, skip blocking ops, formatting opts
+	cmd += ' -RPn -F Ttpfn';
 	
 	cp.exec( cmd, { timeout: 10 * 1000 }, function(err, stdout, stderr) {
 		if (err) return callback(err);
@@ -692,6 +692,13 @@ function getOpenFiles(callback) {
 				case 'n':
 					// file path
 					if (cur_file) cur_file.path = value;
+				break;
+				
+				case 'T':
+					// TCP socket info (append if applicable)
+					if (cur_file && cur_file.path && value.match(/ST\=(.+)$/)) {
+						cur_file.path += ' (' + RegExp.$1 + ')';
+					}
 				break;
 			} // switch code
 		} ); // foreach line
