@@ -4,7 +4,7 @@
 // Gathers metrics and submits them to a Performa master server
 // Install via crontab to run every minute
 // See: https://github.com/jhuckaby/performa-satellite
-// Copyright (c) 2019 - 2020 Joseph Huckaby, MIT License
+// Copyright (c) 2019 - 2021 Joseph Huckaby, MIT License
 
 var fs = require('fs');
 var os = require('os');
@@ -126,7 +126,12 @@ var host_hash = Tools.digestHex( info.hostname, 'md5' );
 var host_id = parseInt( host_hash.substring(0, 8), 16 ); // 32-bit numerical hash
 var state_file = Path.join( os.tmpdir(), "performa-satellite-temp.json" );
 var state = {};
-var snapshot = { network: {}, processes: {} };
+
+var snapshot = { 
+	network: {}, 
+	processes: {}, 
+	files: { list: [] } 
+};
 
 if (config.use_curl) {
 	// use curl instead of pixl-request
@@ -610,26 +615,87 @@ async.series([
 							process.pcpu = pids[process.pid].cpu;
 							process.mem_rss = pids[process.pid].mem;
 						}
-					} );
+					} ); 
 					
-					request.json( url, snapshot, function(err, resp, data, perf) {
-						if (err) {
-							var err_file = Path.join( os.tmpdir(), "performa-satellite-error.txt" );
-							fs.writeFileSync( err_file, [
-								"Date/Time: " + (new Date()).toString(),
-								"URL: " + url,
-								"Error: " + err,
-								"Data:",
-								JSON.stringify(snapshot)
-							].join("\n") + "\n" );
-							
-							die("Performa Satellite Error: Failed to submit snapshot data: " + err + "\n");
-						}
-						callback();
-					});
+					// add all open files to the snap
+					getOpenFiles( function(err) {
+						// ignore error (not much we can do about it here)
+						
+						// now send the snapshot to the server
+						request.json( url, snapshot, function(err, resp, data, perf) {
+							if (err) {
+								var err_file = Path.join( os.tmpdir(), "performa-satellite-error.txt" );
+								fs.writeFileSync( err_file, [
+									"Date/Time: " + (new Date()).toString(),
+									"URL: " + url,
+									"Error: " + err,
+									"Data:",
+									JSON.stringify(snapshot)
+								].join("\n") + "\n" );
+								
+								die("Performa Satellite Error: Failed to submit snapshot data: " + err + "\n");
+							}
+							callback();
+						}); // request.json
+					}); // getOpenFiles
 				}); // cp.exec
-			}
+			} // snapshot
 			else callback();
-		});
-	}
-]);
+		}); // request.json
+	} // done
+]); // async.series
+
+function getOpenFiles(callback) {
+	// use lsof to include all open files to the snap
+	var lsof = Tools.findBinSync('lsof');
+	if (!lsof) return callback( new Error("Cannot locate lsof binary.") );
+	
+	// lsof options: machine-readable output, and skip blocking ops
+	var cmd = lsof + ' -RPn -F tpfn';
+	
+	cp.exec( cmd, { timeout: 10 * 1000 }, function(err, stdout, stderr) {
+		if (err) return callback(err);
+		
+		// parse lsof output
+		var files = [];
+		var cur_proc = null;
+		var cur_file = null;
+		
+		stdout.split(/\n/).forEach( function(line) {
+			if (!line.match(/^(\w)(.+)$/)) return;
+			var code = RegExp.$1;
+			var value = RegExp.$2;
+			
+			switch (code) {
+				case 'p':
+					// new process
+					if (cur_proc && cur_file) files.push( Tools.mergeHashes(cur_proc, cur_file) );
+					cur_proc = { pid: parseInt(value) };
+					cur_file = null;
+				break;
+				
+				case 'f':
+					// new file
+					if (cur_proc && cur_file) files.push( Tools.mergeHashes(cur_proc, cur_file) );
+					cur_file = { desc: value };
+				break;
+				
+				case 't':
+					// file type
+					if (cur_file) cur_file.type = value;
+				break;
+				
+				case 'n':
+					// file path
+					if (cur_file) cur_file.path = value;
+				break;
+			} // switch code
+		} ); // foreach line
+		
+		if (cur_proc && cur_file) files.push( Tools.mergeHashes(cur_proc, cur_file) );
+		
+		snapshot.files.list = files;
+		callback();
+		
+	}); // cp.exec
+};

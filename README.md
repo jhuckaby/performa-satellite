@@ -90,7 +90,7 @@ npm run package
 
 **The MIT License**
 
-*Copyright (c) 2019 Joseph Huckaby.*
+*Copyright (c) 2019 - 2021 Joseph Huckaby.*
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
