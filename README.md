@@ -8,12 +8,19 @@ The easiest way to install Performa Satellite is to use one of our precompiled b
 
 ```
 mkdir /opt/performa
-curl -L https://github.com/jhuckaby/performa-satellite/releases/latest/download/performa-satellite-linux > /opt/performa/satellite.bin
+curl -L https://github.com/jhuckaby/performa-satellite/releases/latest/download/performa-satellite-linux-x64 > /opt/performa/satellite.bin
 chmod 755 /opt/performa/satellite.bin
 /opt/performa/satellite.bin --install
 ```
 
-The `linux` binary should work on any 64-bit Linux OS, including RedHat/CentOS and Debian/Ubuntu.  If you are installing on macOS, replace `linux` with `macos`.  There is also a [Windows executable](https://github.com/jhuckaby/performa-satellite/releases/download/v1.0.0/performa-satellite-win.exe) available, but it is untested (and no [cron](https://en.wikipedia.org/wiki/Cron) there to automate launching it).
+Note that in this case you will have to select the correct binary for your platform.  The static binary flavors available are:
+
+- `performa-satellite-linux-arm64`
+- `performa-satellite-linux-x64`
+- `performa-satellite-macos-arm64`
+- `performa-satellite-macos-x64`
+
+The `performa-satellite-linux-x86` binary should work on any 64-bit Linux OS on x86 hardware, including RedHat/CentOS and Debian/Ubuntu.  Change `x86` to `arm64` if you are running Linux on ARM (e.g. Raspberry Pi).  If you are installing on macOS, replace `linux` with `macos`, but note your Mac's architecture (`x64` or `arm64` a.k.a. Apple Silicon).
 
 Running the binary with the `--install` argument will add it to [cron](https://en.wikipedia.org/wiki/Cron), specifically in `/etc/cron.d/performa-satellite.cron`, which is set to run once per minute.  It also creates a default configuration file, if one doesn't exist.
 
@@ -36,12 +43,9 @@ Here are descriptions of the properties you can put in the file:
 |---------------|------|-------------|
 | `enabled` | Boolean | This enables or disables Performa Satellite.  Set this to `false` to pause metrics collection. |
 | `host` | String | Set this to the hostname and port of your Performa master server, e.g. `performa.mycompany.com:5511`.  The default port for Performa is `5511`. |
-| `secret_key` | String | **(Optional)** If you plan on using [custom commands](https://github.com/jhuckaby/performa#commands), set this to the same secret key string on your Performa master server.  See [Secret Key](https://github.com/jhuckaby/performa#secret_key) for details. |
+| `secret_key` | String | Set this to the same secret key string on your Performa master server.  See [Secret Key](https://github.com/jhuckaby/performa#secret_key) for details. |
 | `group` | String | **(Optional)** The group ID is optional, and only needed if you have servers with indeterminate hostnames (i.e. serverless, autoscale, etc.).  See [Groups](https://github.com/jhuckaby/performa#groups) for details. |
 | `proto` | String | **(Optional)** If you have configured your Performa master server with HTTPS, Satellite can send metrics securely by setting this property to `https:`. |
-| `insecure` | Boolean | **(Optional)** If you are using HTTPS but have a self-signed SSL certificate, setting this property to `true` will bypass certificate verification when making HTTPS requests. |
-
-**Note:** If you set a `secret_key` it is highly recommended that you also set the config file owner to `root` and the permissions to `600`, so only the root user can read it.
 
 ## Command-Line Arguments
 
@@ -90,7 +94,7 @@ npm run package
 
 **The MIT License**
 
-*Copyright (c) 2019 - 2021 Joseph Huckaby.*
+*Copyright (c) 2019 - 2024 Joseph Huckaby.*
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

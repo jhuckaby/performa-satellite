@@ -4,7 +4,7 @@
 // Gathers metrics and submits them to a Performa master server
 // Install via crontab to run every minute
 // See: https://github.com/jhuckaby/performa-satellite
-// Copyright (c) 2019 - 2021 Joseph Huckaby, MIT License
+// Copyright (c) 2019 - 2024 Joseph Huckaby, MIT License
 
 var fs = require('fs');
 var os = require('os');
@@ -16,7 +16,7 @@ var cli = require('pixl-cli');
 var si = require('systeminformation');
 var sqparse = require('shell-quote').parse;
 
-var request = new Request("Performa-Satellite/1.1.2");
+var request = new Request("Performa-Satellite/1.1.4");
 request.setTimeout( 5 * 1000 ); // 3 seconds
 request.setAutoError( true );
 request.setRetries( 5 );
@@ -97,10 +97,6 @@ if (!args.debug && config.uid && (process.getuid() == 0)) {
 var api_host = args.host || process.env['PERFORMA_HOST'] || config.host || 'performa.local:5511';
 var api_proto = args.proto || process.env['PERFORMA_PROTO'] || config.proto || 'http:';
 
-if (args.insecure || process.env['PERFORMA_INSECURE'] || config.insecure) {
-	process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-}
-
 // allow server to specify its own group (i.e. for auto-scaling)
 var group_id = args.group || process.env['PERFORMA_GROUP'] || config.group || '';
 
@@ -109,6 +105,7 @@ var info = {
 	version: "1.0",
 	date: (new Date()).getTime() / 1000,
 	hostname: args.hostname || os.hostname(),
+	auth: Tools.digestHex('' + Math.floor(Tools.timeNow(true) / 60) + config.secret_key, 'sha256'),
 	data: {
 		uptime_sec: os.uptime(),
 		arch: os.arch(),
@@ -128,6 +125,7 @@ var state_file = Path.join( os.tmpdir(), "performa-satellite-temp.json" );
 var state = {};
 
 var snapshot = { 
+	auth: info.auth,
 	network: {}, 
 	processes: {}, 
 	files: { list: [] } 
@@ -178,17 +176,14 @@ async.series([
 	},
 	function(callback) {
 		// first call home to say hello and gs list of custom commands to run, if any
-		if (!config.secret_key) return process.nextTick( callback );
+		if (!config.secret_key) die("ERROR: No secret key found in config.json file.\n");
 		
 		var url = api_proto + "//" + api_host + "/api/app/hello";
-		var nonce = Tools.generateUniqueID();
-		var auth = Tools.digestHex(nonce + config.secret_key, 'sha256');
 		
 		var hello = {
 			version: info.version, 
 			hostname: info.hostname, 
-			group: info.group || '',
-			nonce: nonce
+			group: info.group || ''
 		};
 		
 		request.json( url, hello, function(err, resp, data, perf) {
@@ -196,6 +191,8 @@ async.series([
 			var err_msg = '';
 			if (err) err_msg = "Performa Satellite Error: Failed to call home: " + err;
 			else if (data.code) err_msg = "Performa Satellite Error: API returned: " + data.description;
+			else if (!data.version || (data.version !== 2)) err_msg = "Incompatible API Version: Please upgrade both Performa and Performa Satellite to the latest stable release.";
+			
 			if (err_msg) {
 				var err_file = Path.join( os.tmpdir(), "performa-satellite-error.txt" );
 				fs.writeFileSync( err_file, [
@@ -211,15 +208,6 @@ async.series([
 					return callback();
 				}
 				else die( err_msg + "\n" );
-			}
-			
-			// validate nonce and auth
-			if (data.nonce !== nonce) {
-				// should never happen, generate deliberately vague error message
-				die("Performa Satellite Error: Authentication failure\n");
-			}
-			if (data.auth !== auth) {
-				die("Performa Satellite Error: Authentication failure (secret keys do not match)\n");
 			}
 			
 			commands = data.commands || [];
