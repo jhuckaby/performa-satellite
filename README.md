@@ -22,7 +22,7 @@ Note that in this case you will have to select the correct binary for your platf
 
 The `performa-satellite-linux-x86` binary should work on any 64-bit Linux OS on x86 hardware, including RedHat/CentOS and Debian/Ubuntu.  Change `x86` to `arm64` if you are running Linux on ARM (e.g. Raspberry Pi).  If you are installing on macOS, replace `linux` with `macos`, but note your Mac's architecture (`x64` or `arm64` a.k.a. Apple Silicon).
 
-Running the binary with the `--install` argument will add it to [cron](https://en.wikipedia.org/wiki/Cron), specifically in `/etc/cron.d/performa-satellite.cron`, which is set to run once per minute.  It also creates a default configuration file, if one doesn't exist.
+Running the binary with the `--install` argument will add it to [cron](https://en.wikipedia.org/wiki/Cron), specifically in `/etc/cron.d/performa-satellite`, which is set to run once per minute.  It also creates a default configuration file, if one doesn't exist.
 
 # Configuration
 
