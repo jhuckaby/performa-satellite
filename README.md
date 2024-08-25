@@ -46,6 +46,22 @@ Here are descriptions of the properties you can put in the file:
 | `secret_key` | String | Set this to the same secret key string on your Performa master server.  See [Secret Key](https://github.com/jhuckaby/performa#secret_key) for details. |
 | `group` | String | **(Optional)** The group ID is optional, and only needed if you have servers with indeterminate hostnames (i.e. serverless, autoscale, etc.).  See [Groups](https://github.com/jhuckaby/performa#groups) for details. |
 | `proto` | String | **(Optional)** If you have configured your Performa master server with HTTPS, Satellite can send metrics securely by setting this property to `https:`. |
+| `socket_opts` | Object | **(Optional)** Optionally configure the options passed to the Node.js HTTP library.  A potential use case is for SSL self-signed certs (see below). |
+
+To connect with HTTPS and allow self-signed certs, add the following properties to your `config.json` file:
+
+```json
+{
+	"enabled": true,
+	"host": "performa.local:5511",
+	"secret_key": "CHANGE_ME",
+	"group": "",
+	"proto": "https",
+	"socket_opts": {
+		"rejectUnauthorized": false
+	}
+}
+```
 
 ## Command-Line Arguments
 

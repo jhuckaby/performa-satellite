@@ -183,6 +183,7 @@ async.series([
 		if (!config.secret_key) die("ERROR: No secret key found in config.json file.\n");
 		
 		var url = api_proto + "//" + api_host + "/api/app/hello";
+		var opts = config.socket_opts || {};
 		
 		var hello = {
 			version: info.version, 
@@ -190,7 +191,7 @@ async.series([
 			group: info.group || ''
 		};
 		
-		request.json( url, hello, function(err, resp, data, perf) {
+		request.json( url, hello, opts, function(err, resp, data, perf) {
 			// check for error, fatal unless in debug mode
 			var err_msg = '';
 			if (err) err_msg = "Performa Satellite Error: Failed to call home: " + err;
@@ -557,8 +558,9 @@ async.series([
 		
 		// submit metrics to Performa central server via JSON HTTP POST
 		var url = api_proto + "//" + api_host + "/api/app/submit";
+		var opts = config.socket_opts || {};
 		
-		request.json( url, info, function(err, resp, data, perf) {
+		request.json( url, info, opts, function(err, resp, data, perf) {
 			if (err) {
 				var err_file = Path.join( os.tmpdir(), "performa-satellite-error.txt" );
 				fs.writeFileSync( err_file, [
@@ -612,9 +614,10 @@ async.series([
 					// add all open files to the snap
 					getOpenFiles( function(err) {
 						// ignore error (not much we can do about it here)
+						var opts = config.socket_opts || {};
 						
 						// now send the snapshot to the server
-						request.json( url, snapshot, function(err, resp, data, perf) {
+						request.json( url, snapshot, opts, function(err, resp, data, perf) {
 							if (err) {
 								var err_file = Path.join( os.tmpdir(), "performa-satellite-error.txt" );
 								fs.writeFileSync( err_file, [
