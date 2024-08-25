@@ -48,7 +48,7 @@ Here are descriptions of the properties you can put in the file:
 | `proto` | String | **(Optional)** If you have configured your Performa master server with HTTPS, Satellite can send metrics securely by setting this property to `https:`. |
 | `socket_opts` | Object | **(Optional)** Optionally configure the options passed to the Node.js HTTP library.  A potential use case is for SSL self-signed certs (see below). |
 
-To connect with HTTPS and allow self-signed certs, add the following properties to your `config.json` file:
+To connect with HTTPS and allow self-signed certs, add the `proto` and `socket_opts` properties to your `config.json` file:
 
 ```json
 {
