@@ -56,7 +56,7 @@ To connect with HTTPS and allow self-signed certs, add the `proto` and `socket_o
 	"host": "performa.local:5511",
 	"secret_key": "CHANGE_ME",
 	"group": "",
-	"proto": "https",
+	"proto": "https:",
 	"socket_opts": {
 		"rejectUnauthorized": false
 	}
