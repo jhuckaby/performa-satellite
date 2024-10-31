@@ -47,6 +47,7 @@ Here are descriptions of the properties you can put in the file:
 | `group` | String | **(Optional)** The group ID is optional, and only needed if you have servers with indeterminate hostnames (i.e. serverless, autoscale, etc.).  See [Groups](https://github.com/jhuckaby/performa#groups) for details. |
 | `proto` | String | **(Optional)** If you have configured your Performa master server with HTTPS, Satellite can send metrics securely by setting this property to `https:`. |
 | `socket_opts` | Object | **(Optional)** Optionally configure the options passed to the Node.js HTTP library.  A potential use case is for SSL self-signed certs (see below). |
+| `max_sleep_ms` | Number | **(Optional)** Set the maximum random sleep time.  Defaults to 5000 ms.  See [Scalability](#scalability) below for details. |
 
 To connect with HTTPS and allow self-signed certs, add the `proto` and `socket_opts` properties to your `config.json` file:
 
@@ -80,9 +81,11 @@ The Performa Satellite binary executable accepts the following command-line argu
 
 # Scalability
 
-Performa Satellite is designed to run on many servers, and will randomly delay sending metrics by up to 6 seconds, so not all your servers contact the central master server at the same instant.  The same random seed is used for each server (it is based on the hostname) to insure that the metrics collection happens exactly 1 minute apart.
+Performa Satellite is designed to run on many servers, and will randomly delay sending metrics by up to 5 seconds (by default) at the start of each new minute, so not all your servers contact the central master server at the same instant.  The same random seed is used for each server (it is based on the hostname) to insure that the metrics collection happens exactly 1 minute apart on each server.
 
-You can disable the sleep feature by setting the `--nosleep` command-line argument.
+If you have a setup with hundreds of thousands of servers all reporting to the same Performa central server, it is recommended that you increase the max delay from 5 seconds up to 30 seconds.  To do this, edit your Performa Satellite `config.json` file and add a top-level JSON property named `max_sleep_ms`.  This value is in milliseconds, so set it to `30000` for 30 seconds.
+
+You can disable the sleep feature by adding the `--nosleep` command-line argument.
 
 # Development
 
